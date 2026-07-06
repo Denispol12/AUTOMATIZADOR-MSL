@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="MSL Validator – Validación de entradas BibTeX (título y abstract) contra criterios de inclusión y exclusión." />
+  <title>Validador BibTeX · MSL Validator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" media="print" onload="this.media='all'" />
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" /></noscript>
+  <style>
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg:          #0F172A;
+      --surface:     #1E293B;
+      --border:      #334155;
+      --accent:      #3B82F6;
+      --accent-glow: rgba(59, 130, 246, 0.12);
+      --text:        #FFFFFF;
+      --muted:       #94A3B8;
+      --success:     #34d399;
+      --danger:      #f87171;
+      --mono:        'Courier New', 'Consolas', 'Lucida Console', monospace;
+    }
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0 0 4rem;
+    }
+
+    /* ── Page wrapper ── */
+    .page-content {
+      width: 100%;
+      max-width: 1200px;
+      padding: 2.5rem 1.5rem 4rem;
+      margin: 0 auto;
+    }
+
+    /* ── Hero Header ── */
+    header {
+      text-align: left;
+      margin-bottom: 2rem;
+    }
+
+    h1 {
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #FFFFFF;
+      line-height: 1.1;
+    }
+
+    header p {
+      margin-top: 0.5rem;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    /* ── Drop Zone ── */
+    .dropzone {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      border: 2px dashed var(--border);
+      border-radius: 4px;
+      padding: 2rem 1rem;
+      cursor: pointer;
+      transition: border-color 0.2s ease, background 0.2s ease;
+      text-align: center;
+    }
+
+    .dropzone:hover,
+    .dropzone.drag-over {
+      border-color: var(--accent);
+      background: var(--accent-glow);
+    }
+
+    .dropzone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+
+    .dropzone-icon {
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 0.25rem;
+    }
+
+    .dropzone-icon svg {
+      width: 32px;
+      height: 32px;
+      stroke: var(--muted);
+      fill: none;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .dropzone-title {
+      font-family: var(--mono);
+      font-size: 0.9rem;
+      color: var(--text);
+    }
+
+    .dropzone-title span { color: var(--accent); text-decoration: underline; }
+
+    .dropzone-sub {
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+
+    /* ── Button Primary ── */
+    .btn-primary {
+      display: block;
+      width: 100%;
+      margin-top: 1rem;
+      padding: 0.75rem;
+      background: #3B82F6;
+      color: #fff;
+      font-family: var(--mono);
+      font-size: 0.88rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: opacity 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    .btn-primary:hover { opacity: 0.88; }
+    .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    /* ── Badge Count ── */
+    .badge-count {
+      background: rgba(59,130,246,0.15);
+      color: var(--accent);
+      border-radius: 999px;
+      padding: 0.15rem 0.65rem;
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+
+    /* ── Progress States ── */
+    .pi-status {
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+      flex-shrink: 0;
+    }
+
+    .pi-status.pending  { background: rgba(148,163,184,0.15); color: var(--muted); }
+    .pi-status.running  { background: rgba(59,130,246,0.15);  color: var(--accent); }
+    .pi-status.done     { background: rgba(52,211,153,0.15);  color: var(--success); }
+    .pi-status.error    { background: rgba(248,113,113,0.15); color: var(--danger); }
+
+    .spinner {
+      width: 14px; height: 14px;
+      border: 2px solid rgba(59,130,246,0.3);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.75s linear infinite;
+      display: inline-block;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Upload card ── */
+    .bib-upload-card {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    /* ── Table ── */
+    .tabla-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+    }
+
+    thead tr {
+      background: rgba(255,255,255,0.03);
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      padding: 0.75rem 1rem;
+      text-align: left;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 0.7rem 1rem;
+      color: var(--text);
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      vertical-align: top;
+    }
+
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr { transition: background 0.15s ease; }
+    tbody tr:hover { background: rgba(255,255,255,0.025); }
+
+    tbody tr.dec-incluido  { border-left: 3px solid var(--success); }
+    tbody tr.dec-excluido  { border-left: 3px solid var(--danger); }
+    tbody tr.dec-revisar   { border-left: 3px solid #fbbf24; }
+
+    .badge-dec {
+      display: inline-block;
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .badge-dec.incluido  { background: rgba(52,211,153,0.15); color: var(--success); }
+    .badge-dec.excluido  { background: rgba(248,113,113,0.15); color: var(--danger); }
+    .badge-dec.revisar   { background: rgba(251,191,36,0.15);  color: #fbbf24; }
+
+    .badge-conf {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 999px;
+      font-size: 0.68rem;
+      font-weight: 600;
+      background: rgba(255,255,255,0.07);
+      color: var(--muted);
+    }
+
+    .bib-titulo {
+      max-width: 380px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    .bib-autores {
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+
+    .td-just {
+      max-width: 300px;
+      line-height: 1.5;
+      color: var(--muted);
+    }
+
+    .btn-del {
+      background: rgba(248,113,113,0.1);
+      border: 1px solid rgba(248,113,113,0.25);
+      color: var(--danger);
+      border-radius: 4px;
+      padding: 0.3rem 0.65rem;
+      font-size: 0.72rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s ease;
+      white-space: nowrap;
+    }
+
+    .btn-del:hover { background: rgba(248,113,113,0.22); }
+
+    .tabla-vacia {
+      text-align: center;
+      padding: 2.5rem;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    .resultados-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+    }
+
+    .resultados-header h2 {
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    /* ── Footer ── */
+    footer {
+      margin-top: auto;
+      padding-top: 3rem;
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-align: center;
+    }
+
+  </style>
+</head>
+<body data-page="bibtex">
+  <div id="navbar-container"></div>
+
+  <div class="page-content">
+
+    <header>
+      <h1>Validador BibTeX</h1>
+      <p>Valida entradas bibliográficas por título y abstract contra tus criterios</p>
+    </header>
+
+    <!-- Zona de carga .bib -->
+    <div class="bib-upload-card">
+      <h2 style="font-family:'Inter',sans-serif;font-size:1rem;font-weight:700;color:var(--text);letter-spacing:normal;text-transform:none;margin:0 0 1rem;">Subir archivo BibTeX</h2>
+      <div class="dropzone" id="bib-dropzone">
+        <input type="file" id="bib-input" accept=".bib" aria-label="Seleccionar archivo BibTeX" />
+        <div class="dropzone-icon">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+          </svg>
+        </div>
+        <p class="dropzone-title">Arrastra tu archivo .bib aquí o <span>selecciona</span></p>
+        <p class="dropzone-sub">Archivo BibTeX exportado de Scopus, IEEE, etc.</p>
+      </div>
+      <div id="bib-file-info" style="display:none; margin-top:1rem; padding:0.6rem 1rem; background:rgba(59,130,246,0.07); border:1px solid rgba(59,130,246,0.2); border-radius:4px; font-size:0.82rem; align-items:center; gap:0.5rem;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <span id="bib-file-name" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+        <span id="bib-entry-count" class="badge-count">0</span>
+        <span style="color:var(--muted);font-size:0.75rem">entradas</span>
+      </div>
+    </div>
+
+    <!-- Tabla de entradas parseadas -->
+    <div id="bib-entries-section" style="display:none; width:100%; margin-bottom:2rem;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+        <h2 style="font-size:0.8rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted)">Entradas encontradas</h2>
+        <div style="display:flex;align-items:center;gap:0.6rem">
+          <span class="badge-count" id="bib-parsed-count">0</span>
+          <button class="btn-primary" id="btn-validar-bib" disabled
+            style="width:auto;margin:0;padding:0.6rem 1.5rem;font-size:0.85rem;border-radius:4px;">
+            Validar todas
+          </button>
+        </div>
+      </div>
+      <div class="tabla-wrap" style="max-height:350px; overflow-y:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Título</th>
+              <th>Año</th>
+              <th>Autores</th>
+              <th>Abstract</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody id="bib-entries-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Resultados BibTeX -->
+    <section id="resultados-bib" aria-live="polite" aria-label="Resultados BibTeX" style="width:100%;"></section>
+
+  </div><!-- /page-content -->
+
+  <footer>
+    MSL Validator &nbsp;·&nbsp; v0.2.0
+  </footer>
+
+<script>
+/* ════════════════════════════════════════════════════════════
+   MSL Validator BibTeX — frontend logic
+   ════════════════════════════════════════════════════════════ */
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── BibTeX Logic ─────────────────────────────────────────────────────────────
+const bibInput       = document.getElementById('bib-input');
+const bibDropzone    = document.getElementById('bib-dropzone');
+const bibFileInfo    = document.getElementById('bib-file-info');
+const bibFileName    = document.getElementById('bib-file-name');
+const bibEntryCount  = document.getElementById('bib-entry-count');
+const bibSection     = document.getElementById('bib-entries-section');
+const bibParsedCount = document.getElementById('bib-parsed-count');
+const bibBody        = document.getElementById('bib-entries-body');
+const btnValidarBib  = document.getElementById('btn-validar-bib');
+const secResultBib   = document.getElementById('resultados-bib');
+
+let bibEntradas = [];
+let bibIsValidating = false;
+let bibCancelRequested = false;
+let bibAbortController = null;
+
+// ── Drag & drop for .bib ──────────────────────────────────────────────────
+bibDropzone.addEventListener('dragover', e => { e.preventDefault(); bibDropzone.classList.add('drag-over'); });
+bibDropzone.addEventListener('dragleave', () => bibDropzone.classList.remove('drag-over'));
+bibDropzone.addEventListener('drop', e => {
+  e.preventDefault();
+  bibDropzone.classList.remove('drag-over');
+  const file = [...e.dataTransfer.files].find(f => f.name.toLowerCase().endsWith('.bib'));
+  if (file) subirBib(file);
+});
+
+bibInput.addEventListener('change', () => {
+  if (bibInput.files.length > 0) subirBib(bibInput.files[0]);
+  bibInput.value = '';
+});
+
+// ── Upload .bib → POST /subir-bibtex ──────────────────────────────────────
+async function subirBib(file) {
+  try {
+    const fd = new FormData();
+    fd.append('archivo', file);
+    const res = await fetch('/subir-bibtex', { method: 'POST', body: fd });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }));
+      throw new Error(err.detail || res.statusText);
+    }
+    const data = await res.json();
+    bibEntradas = data.entradas;
+
+    bibFileInfo.style.display = 'flex';
+    bibFileName.textContent = file.name;
+    bibEntryCount.textContent = data.total;
+
+    bibSection.style.display = 'block';
+    bibParsedCount.textContent = data.total;
+    btnValidarBib.disabled = data.total === 0;
+
+    renderBibEntries();
+  } catch (err) {
+    alert('Error al parsear BibTeX: ' + err.message);
+  }
+}
+
+// ── Render parsed entries ─────────────────────────────────────────────────
+function renderBibEntries() {
+  bibBody.innerHTML = '';
+  bibEntradas.forEach((entry, i) => {
+    const abstractPreview = entry.abstract
+      ? (entry.abstract.length > 60 ? entry.abstract.substring(0, 60) + '…' : entry.abstract)
+      : '(sin abstract)';
+
+    const tr = document.createElement('tr');
+    tr.className = 'bib-entry-row';
+    tr.id = `bib-row-${i}`;
+    tr.innerHTML = `
+      <td style="color:var(--muted);font-size:0.72rem">${i + 1}</td>
+      <td class="bib-titulo" title="${escHtml(entry.titulo)}">${escHtml(entry.titulo || '(sin título)')}</td>
+      <td style="color:var(--muted);font-size:0.78rem;white-space:nowrap">${escHtml(entry.anio || '—')}</td>
+      <td class="bib-autores" title="${escHtml(entry.autores)}">${escHtml(entry.autores || '—')}</td>
+      <td style="color:var(--muted);font-size:0.75rem;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(entry.abstract)}">${escHtml(abstractPreview)}</td>
+      <td><span class="pi-status pending" id="bib-st-${i}">Pendiente</span></td>
+    `;
+    bibBody.appendChild(tr);
+  });
+}
+
+// ── Validate all entries ──────────────────────────────────────────────────
+btnValidarBib.addEventListener('click', async () => {
+  if (bibIsValidating) {
+    bibCancelRequested = true;
+    if (bibAbortController) bibAbortController.abort();
+    btnValidarBib.textContent = 'Cancelando...';
+    btnValidarBib.disabled = true;
+    return;
+  }
+
+  if (bibEntradas.length === 0) return;
+
+  const cola = bibEntradas.map((e, i) => ({ entry: e, idx: i })).filter(({ idx }) => {
+    const st = document.getElementById(`bib-st-${idx}`);
+    return !st || st.textContent !== '✓ Listo';
+  });
+
+  if (cola.length === 0) return;
+
+  bibIsValidating = true;
+  bibCancelRequested = false;
+
+  btnValidarBib.textContent = 'Cancelar validación';
+  btnValidarBib.style.background = 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)';
+  btnValidarBib.style.boxShadow = '0 4px 20px rgba(239, 68, 68, 0.3)';
+
+  bibInput.disabled = true;
+  bibDropzone.style.pointerEvents = 'none';
+
+  const CHUNK_SIZE = 10;
+  const totalLotes = Math.ceil(cola.length / CHUNK_SIZE);
+  let loteActual = 1;
+
+  for (let i = 0; i < cola.length; i += CHUNK_SIZE) {
+    if (bibCancelRequested) break;
+
+    btnValidarBib.textContent = `Cancelar validación (Lote ${loteActual} de ${totalLotes})`;
+
+    const chunk = cola.slice(i, i + CHUNK_SIZE);
+    bibAbortController = new AbortController();
+
+    chunk.forEach(({ idx }) => {
+      const stEl = document.getElementById(`bib-st-${idx}`);
+      if (stEl) {
+        stEl.className = 'pi-status running';
+        stEl.innerHTML = `<div class="spinner" style="display:inline-block;vertical-align:middle;margin-right:4px;width:10px;height:10px;border-width:2px"></div>Lote ${loteActual} de ${totalLotes}`;
+      }
+    });
+
+    try {
+      const res = await fetch('/evaluar-bibtex', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(chunk.map(c => c.entry)),
+        signal: bibAbortController.signal,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(err.detail || res.statusText);
+      }
+
+      chunk.forEach(({ idx }) => {
+        const stEl = document.getElementById(`bib-st-${idx}`);
+        if (stEl) {
+          stEl.className = 'pi-status done';
+          stEl.textContent = '✓ Listo';
+        }
+      });
+    } catch (err) {
+      chunk.forEach(({ idx }) => {
+        const stEl = document.getElementById(`bib-st-${idx}`);
+        if (stEl) {
+          if (err.name === 'AbortError') {
+            stEl.className = 'pi-status pending';
+            stEl.textContent = 'Cancelado';
+          } else {
+            stEl.className = 'pi-status error';
+            stEl.textContent = '✗ Error';
+            stEl.title = err.message;
+          }
+        }
+      });
+    } finally {
+      bibAbortController = null;
+    }
+
+    await cargarResultadosBib();
+    loteActual++;
+  }
+
+  bibIsValidating = false;
+  bibCancelRequested = false;
+
+  btnValidarBib.textContent = 'Validar todas';
+  btnValidarBib.style.background = '';
+  btnValidarBib.style.boxShadow = '';
+
+  const quedanPendientes = Array.from(bibBody.querySelectorAll('.pi-status')).some(el => el.textContent !== '✓ Listo');
+  btnValidarBib.disabled = !quedanPendientes;
+
+  bibInput.disabled = false;
+  bibDropzone.style.pointerEvents = 'auto';
+});
+
+// ── GET /resultados-bibtex ────────────────────────────────────────────────
+async function cargarResultadosBib() {
+  try {
+    const res = await fetch('/resultados-bibtex');
+    const rows = await res.json();
+    renderTablaBib(rows);
+  } catch (e) {
+    console.error('Error cargando resultados BibTeX:', e);
+  }
+}
+
+function renderTablaBib(rows) {
+  let wrap = secResultBib.querySelector('.tabla-wrap');
+  if (!wrap) {
+    wrap = document.createElement('div');
+    wrap.className = 'tabla-wrap';
+    secResultBib.appendChild(wrap);
+  }
+
+  let hdr = secResultBib.querySelector('.resultados-header');
+  if (!hdr) {
+    hdr = document.createElement('div');
+    hdr.className = 'resultados-header';
+    hdr.innerHTML = `
+      <h2>Resultados BibTeX</h2>
+      <div style="display:flex;align-items:center;gap:0.6rem">
+        <span class="badge-count" id="bib-result-count">0</span>
+        <a id="btn-excel-bib" href="/exportar-bibtex" target="_blank"
+           style="display:inline-flex;align-items:center;gap:0.4rem;
+                  background:linear-gradient(135deg,#22c55e,#16a34a);
+                  color:#fff;font-size:0.75rem;font-weight:700;
+                  padding:0.3rem 0.85rem;border-radius:999px;
+                  text-decoration:none;letter-spacing:0.04em;
+                  box-shadow:0 2px 12px rgba(34,197,94,0.3);
+                  transition:opacity 0.2s,transform 0.15s"
+           onmouseover="this.style.opacity='.85';this.style.transform='translateY(-1px)'"
+           onmouseout="this.style.opacity='1';this.style.transform='translateY(0)'">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2.5"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          Descargar Excel
+        </a>
+        <button id="btn-limpiar-bib"
+           style="display:inline-flex;align-items:center;gap:0.4rem;
+                  background:linear-gradient(135deg,#f87171,#dc2626);
+                  color:#fff;font-size:0.75rem;font-weight:700;
+                  padding:0.3rem 0.85rem;border-radius:999px;border:none;
+                  cursor:pointer;letter-spacing:0.04em;
+                  box-shadow:0 2px 12px rgba(248,113,113,0.3);
+                  transition:opacity 0.2s,transform 0.15s"
+           onmouseover="this.style.opacity='.85';this.style.transform='translateY(-1px)'"
+           onmouseout="this.style.opacity='1';this.style.transform='translateY(0)'">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/>
+            <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
+          </svg>
+          Limpiar tabla
+        </button>
+      </div>
+    `;
+    secResultBib.insertBefore(hdr, wrap);
+  }
+  document.getElementById('bib-result-count').textContent = rows.length;
+
+  if (rows.length === 0) {
+    wrap.innerHTML = `<div class="tabla-vacia">Sin resultados aún. Sube un .bib y valida para empezar.</div>`;
+    return;
+  }
+
+  wrap.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Título</th>
+          <th>Año</th>
+          <th>Decisión</th>
+          <th>Confianza</th>
+          <th>Fallo</th>
+          <th>Justificación</th>
+          <th>Fecha</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map(r => filaBibHTML(r)).join('')}
+      </tbody>
+    </table>
+  `;
+
+  wrap.querySelectorAll('.btn-del-bib').forEach(btn => {
+    btn.addEventListener('click', () => eliminarFilaBib(Number(btn.dataset.id)));
+  });
+}
+
+function filaBibHTML(r) {
+  const dec = (r.decision || '').toLowerCase();
+  const cls = dec === 'incluido' ? 'incluido' : dec === 'excluido' ? 'excluido' : 'revisar';
+  const decLbl = dec === 'incluido' ? 'Incluido' : dec === 'excluido' ? 'Excluido' : 'Revisar';
+  const fecha = (r.fecha || '').split(' ')[0];
+
+  return `
+    <tr class="dec-${cls}">
+      <td style="color:var(--muted);font-size:0.72rem">${r.id}</td>
+      <td class="td-archivo" title="${escHtml(r.titulo || '')}">${escHtml(r.titulo || '')}</td>
+      <td style="color:var(--muted);font-size:0.78rem;white-space:nowrap">${escHtml(r.anio || '—')}</td>
+      <td><span class="badge-dec ${cls}">${decLbl}</span></td>
+      <td><span class="badge-conf">${escHtml(r.confianza || '-')}</span></td>
+      <td style="color:var(--muted);font-size:0.75rem;white-space:nowrap">${escHtml(r.criterio_fallo || '—')}</td>
+      <td class="td-just">${escHtml(r.justificacion || '')}</td>
+      <td style="color:var(--muted);font-size:0.72rem;white-space:nowrap">${escHtml(fecha)}</td>
+      <td><button class="btn-del-bib btn-del" data-id="${r.id}" aria-label="Eliminar fila BibTeX ${r.id}">Eliminar</button></td>
+    </tr>
+  `;
+}
+
+async function eliminarFilaBib(id) {
+  try {
+    const res = await fetch(`/resultados-bibtex/${id}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error(await res.text());
+    await cargarResultadosBib();
+  } catch (e) {
+    alert('Error eliminando resultado BibTeX: ' + e.message);
+  }
+}
+
+// Limpiar tabla completa BibTeX
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest('#btn-limpiar-bib');
+  if (!btn) return;
+  if (!confirm('¿Eliminar TODOS los resultados BibTeX? Esta acción no se puede deshacer.')) return;
+  try {
+    const res = await fetch('/resultados-bibtex', { method: 'DELETE' });
+    if (!res.ok) throw new Error(await res.text());
+    await cargarResultadosBib();
+  } catch (e) {
+    alert('Error al limpiar resultados BibTeX: ' + e.message);
+  }
+});
+
+// Cargar resultados BibTeX al inicio
+document.addEventListener('DOMContentLoaded', cargarResultadosBib);
+
+</script>
+
+<script src="/components/navbar.js?v=2"></script>
+
+</body>
+</html>

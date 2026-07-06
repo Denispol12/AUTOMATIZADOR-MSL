@@ -1,0 +1,1527 @@
+<!--
+  NAVEGACIÓN (Etapa 15 – CASO A):
+  El validador de PDFs y el validador BibTeX viven como pestañas dentro
+  de este mismo archivo (data-tab="pdf" / data-tab="bibtex").
+  El navbar compartido (static/components/navbar.js) se carga una sola
+  vez al final del body y resalta "Validador PDF" (data-page="pdf" en
+  <body>) para ambas pestañas, ya que la URL no cambia al alternar entre
+  ellas. No se requiere un archivo bibtex.html separado.
+-->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="MSL Validator – Validación automática de archivos PDF y BibTeX contra listas maestras." />
+  <title>MSL Validator</title>
+  <!-- Google Fonts: non-blocking para evitar pantalla en blanco sin red -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" media="print" onload="this.media='all'" />
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" /></noscript>
+  <style>
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg:          #0F172A;
+      --surface:     #1E293B;
+      --border:      #334155;
+      --accent:      #3B82F6;
+      --accent-glow: rgba(59, 130, 246, 0.12);
+      --text:        #FFFFFF;
+      --muted:       #94A3B8;
+      --success:     #34d399;
+      --danger:      #f87171;
+      --mono:        'Courier New', 'Consolas', 'Lucida Console', monospace;
+    }
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0 0 4rem;
+    }
+
+    /* ── Page wrapper ── */
+    .page-content {
+      width: 100%;
+      max-width: 1200px;
+      padding: 2.5rem 1.5rem 4rem;
+      margin: 0 auto;
+    }
+
+    /* ── Hero Header ── */
+    header {
+      text-align: left;
+      margin-bottom: 2rem;
+    }
+
+    header .badge { display: none; }
+
+    h1 {
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #FFFFFF;
+      line-height: 1.1;
+    }
+
+    header p {
+      margin-top: 0.5rem;
+      color: var(--muted);
+      font-size: 0.95rem;
+      font-weight: 400;
+    }
+
+    /* ── Upload Card ── */
+    .card {
+      width: 100%;
+      max-width: 680px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 1.25rem;
+      padding: 2.5rem 2rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 4px 40px rgba(0, 0, 0, 0.35);
+    }
+
+    .card h2 {
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 1.2rem;
+    }
+
+    /* ── Drop Zone ── */
+    .dropzone {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      border: 2px dashed var(--border);
+      border-radius: 0.875rem;
+      padding: 1.25rem 1rem;
+      cursor: pointer;
+      transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+      text-align: center;
+    }
+
+    .dropzone:hover,
+    .dropzone.drag-over {
+      border-color: var(--accent);
+      background: var(--accent-glow);
+      box-shadow: 0 0 0 4px rgba(79, 142, 247, 0.08);
+    }
+
+    .dropzone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+
+    .dropzone-icon {
+      width: 44px;
+      height: 44px;
+      background: rgba(79, 142, 247, 0.12);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 0.25rem;
+      transition: transform 0.2s ease;
+    }
+
+    .dropzone:hover .dropzone-icon {
+      transform: scale(1.08);
+    }
+
+    .dropzone-icon svg {
+      width: 26px;
+      height: 26px;
+      stroke: var(--accent);
+      fill: none;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .dropzone-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .dropzone-title span {
+      color: var(--accent);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .dropzone-sub {
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    /* ── File list preview ── */
+    #file-list {
+      margin-top: 1.2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .file-pill {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      background: rgba(79, 142, 247, 0.07);
+      border: 1px solid rgba(79, 142, 247, 0.2);
+      border-radius: 0.5rem;
+      padding: 0.45rem 0.9rem;
+      font-size: 0.82rem;
+      color: var(--text);
+      animation: fadeSlide 0.2s ease;
+    }
+
+    .file-pill svg {
+      width: 14px;
+      height: 14px;
+      stroke: var(--accent);
+      fill: none;
+      stroke-width: 2;
+      flex-shrink: 0;
+    }
+
+    @keyframes fadeSlide {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Action Button ── */
+    .btn-primary {
+      display: block;
+      width: 100%;
+      margin-top: 1.5rem;
+      padding: 0.85rem;
+      background: linear-gradient(135deg, #4f8ef7 0%, #6d5ff7 100%);
+      color: #fff;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 0.75rem;
+      cursor: pointer;
+      transition: opacity 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+      box-shadow: 0 4px 20px rgba(79, 142, 247, 0.3);
+    }
+
+    .btn-primary:hover {
+      opacity: 0.92;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 28px rgba(79, 142, 247, 0.45);
+    }
+
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+
+    /* ── Resultados ── */
+    #resultados {
+      width: 100%;
+      max-width: 1100px;
+      margin-top: 3rem;
+    }
+
+    .resultados-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+    }
+
+    .resultados-header h2 {
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .badge-count {
+      background: rgba(79,142,247,0.15);
+      color: var(--accent);
+      border-radius: 999px;
+      padding: 0.15rem 0.65rem;
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+
+    /* ── Progress / estado por archivo ── */
+    .progress-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-bottom: 1.2rem;
+    }
+
+    .progress-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 0.6rem;
+      padding: 0.6rem 1rem;
+      font-size: 0.83rem;
+      animation: fadeSlide 0.2s ease;
+    }
+
+    .progress-item .pi-name {
+      flex: 1;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .pi-status {
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+      flex-shrink: 0;
+    }
+
+    .pi-status.pending  { background: rgba(123,127,150,0.15); color: var(--muted); }
+    .pi-status.running  { background: rgba(79,142,247,0.15);  color: var(--accent); }
+    .pi-status.done     { background: rgba(52,211,153,0.15);  color: var(--success); }
+    .pi-status.error    { background: rgba(248,113,113,0.15); color: var(--danger); }
+
+    .spinner {
+      width: 14px; height: 14px;
+      border: 2px solid rgba(79,142,247,0.3);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.75s linear infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Tabla de resultados ── */
+    .tabla-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+    }
+
+    thead tr {
+      background: rgba(255,255,255,0.03);
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      padding: 0.75rem 1rem;
+      text-align: left;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 0.7rem 1rem;
+      color: var(--text);
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      vertical-align: top;
+    }
+
+    tbody tr:last-child td { border-bottom: none; }
+
+    tbody tr { transition: background 0.15s ease; }
+    tbody tr:hover { background: rgba(255,255,255,0.025); }
+
+    /* Colores de decisión */
+    tbody tr.dec-incluido  { border-left: 3px solid var(--success); }
+    tbody tr.dec-excluido  { border-left: 3px solid var(--danger); }
+    tbody tr.dec-revisar   { border-left: 3px solid #fbbf24; }
+
+    .badge-dec {
+      display: inline-block;
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .badge-dec.incluido  { background: rgba(52,211,153,0.15); color: var(--success); }
+    .badge-dec.excluido  { background: rgba(248,113,113,0.15); color: var(--danger); }
+    .badge-dec.revisar   { background: rgba(251,191,36,0.15);  color: #fbbf24; }
+
+    .badge-conf {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 999px;
+      font-size: 0.68rem;
+      font-weight: 600;
+      background: rgba(255,255,255,0.07);
+      color: var(--muted);
+    }
+
+    .td-archivo {
+      max-width: 180px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-family: monospace;
+      font-size: 0.78rem;
+      color: var(--accent);
+    }
+
+    .td-just {
+      max-width: 300px;
+      line-height: 1.5;
+      color: var(--muted);
+    }
+
+    .btn-del {
+      background: rgba(248,113,113,0.1);
+      border: 1px solid rgba(248,113,113,0.25);
+      color: var(--danger);
+      border-radius: 0.4rem;
+      padding: 0.3rem 0.65rem;
+      font-size: 0.72rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s ease, transform 0.1s ease;
+      white-space: nowrap;
+    }
+
+    .btn-del:hover {
+      background: rgba(248,113,113,0.22);
+      transform: scale(1.05);
+    }
+
+    .tabla-vacia {
+      text-align: center;
+      padding: 2.5rem;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    /* ── Footer ── */
+    footer {
+      margin-top: auto;
+      padding-top: 3rem;
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    /* ── Main Layout Grid ── */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.1fr 0.8fr;
+      gap: 16px;
+      width: 100%;
+      margin-bottom: 2rem;
+    }
+
+    @media (max-width: 900px) {
+      .main-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+      }
+    }
+
+    .grid-col {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1.25rem 1.25rem 1rem;
+      height: 320px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    
+    /* Internal scrollbar styling */
+    #file-list-container::-webkit-scrollbar,
+    .criterios-content::-webkit-scrollbar {
+      width: 6px;
+    }
+    #file-list-container::-webkit-scrollbar-track,
+    .criterios-content::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    #file-list-container::-webkit-scrollbar-thumb,
+    .criterios-content::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+    }
+    #file-list-container::-webkit-scrollbar-thumb:hover,
+    .criterios-content::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+    .criterios-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    
+    .criterio-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      background: rgba(255, 255, 255, 0.015);
+      border: 1px solid var(--border);
+      border-radius: 0.6rem;
+      padding: 0.75rem 1rem;
+      gap: 1rem;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+    
+    .criterio-row:hover {
+      background: rgba(255, 255, 255, 0.025);
+      border-color: rgba(79, 142, 247, 0.3);
+    }
+    
+    .criterio-code {
+      font-family: monospace;
+      font-weight: 700;
+      color: var(--accent);
+      background: var(--accent-glow);
+      border: 1px solid rgba(79, 142, 247, 0.25);
+      border-radius: 0.3rem;
+      padding: 0.15rem 0.4rem;
+      font-size: 0.75rem;
+      flex-shrink: 0;
+    }
+    
+    .criterio-desc {
+      font-size: 0.82rem;
+      color: var(--text);
+      line-height: 1.4;
+      word-break: break-word;
+    }
+    
+    .criterio-textarea {
+      width: 100%;
+      min-height: 70px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 0.4rem;
+      padding: 0.5rem;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.82rem;
+      resize: vertical;
+      line-height: 1.4;
+      outline: none;
+    }
+    
+    .criterio-textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent-glow);
+    }
+    
+    .btn-edit-row {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 0.4rem;
+      padding: 0.3rem 0.65rem;
+      font-size: 0.72rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+      font-weight: 500;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    
+    .btn-edit-row:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: var(--muted);
+    }
+    
+    .btn-del-row {
+      background: rgba(248, 113, 113, 0.1);
+      border: 1px solid rgba(248, 113, 113, 0.25);
+      color: var(--danger);
+      border-radius: 0.4rem;
+      padding: 0.3rem 0.5rem;
+      font-size: 0.72rem;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background 0.15s, transform 0.1s;
+    }
+    
+    .btn-del-row:hover {
+      background: rgba(248, 113, 113, 0.22);
+      transform: scale(1.05);
+    }
+    
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      border-radius: 0.5rem;
+      padding: 0.45rem 0.9rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s ease, transform 0.1s ease;
+    }
+    
+    .btn-secondary:hover {
+      transform: translateY(-1px);
+    }
+    
+    .btn-secondary.inc {
+      background: rgba(52, 211, 153, 0.1);
+      border: 1px solid rgba(52, 211, 153, 0.25);
+      color: var(--success);
+    }
+    
+    .btn-secondary.inc:hover {
+      background: rgba(52, 211, 153, 0.18);
+    }
+    
+    .btn-secondary.exc {
+      background: rgba(248, 113, 113, 0.1);
+      border: 1px solid rgba(248, 113, 113, 0.25);
+      color: var(--danger);
+    }
+    
+    .btn-secondary.exc:hover {
+      background: rgba(248, 113, 113, 0.18);
+    }
+    
+    .add-form {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border);
+      border-radius: 0.6rem;
+      padding: 1rem;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    
+    .form-input {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 0.4rem;
+      padding: 0.4rem 0.6rem;
+      color: var(--text);
+      font-size: 0.8rem;
+      outline: none;
+    }
+    
+    .form-input:focus {
+      border-color: var(--accent);
+    }
+
+    /* ── Tab System ── */
+    .tab-nav {
+      display: flex;
+      gap: 0;
+      width: 100%;
+      margin-bottom: 2rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .tab-btn {
+      padding: 0.65rem 1.2rem;
+      border: none;
+      border-bottom: 2px solid transparent;
+      background: transparent;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      font-weight: 400;
+      cursor: pointer;
+      border-radius: 0;
+      transition: color 0.15s, border-color 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      white-space: nowrap;
+    }
+
+    .tab-btn:hover {
+      color: var(--text);
+    }
+
+    .tab-btn.active {
+      color: var(--text);
+      font-weight: 700;
+      border-bottom-color: #3B82F6;
+    }
+
+    .tab-btn svg {
+      width: 18px;
+      height: 18px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      flex-shrink: 0;
+    }
+
+    .tab-panel {
+      display: none;
+      width: 100%;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .tab-panel.active {
+      display: flex;
+    }
+
+    /* ── BibTeX specific ── */
+    .bib-upload-card {
+      width: 100%;
+      max-width: 700px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 1.25rem;
+      padding: 2rem;
+      box-shadow: 0 4px 40px rgba(0,0,0,0.35);
+      margin-bottom: 2rem;
+    }
+
+    .bib-entries-table {
+      width: 100%;
+      max-width: 1100px;
+      margin-bottom: 2rem;
+    }
+
+    .bib-entries-table table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+    }
+
+    .bib-entry-row {
+      transition: background 0.15s ease;
+    }
+
+    .bib-entry-row:hover {
+      background: rgba(255,255,255,0.025);
+    }
+
+    .bib-entry-row td {
+      padding: 0.6rem 0.8rem;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      vertical-align: middle;
+    }
+
+    .bib-titulo {
+      max-width: 380px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    .bib-autores {
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+
+    @media (max-width: 900px) {
+      .tab-nav {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body data-page="pdf">
+  <div id="navbar-container"></div>
+  <div class="page-content">
+  <header>
+    <div class="badge">MSL · Validación automatizada</div>
+    <h1>MSL Validator</h1>
+    <p>Valida artículos contra tus criterios de inclusión y exclusión</p>
+  </header>
+
+  <!-- ═══════════ VALIDADOR PDF ═══════════ -->
+
+  <div class="main-grid">
+
+    <!-- COLUMNA 1: Subir PDFs -->
+    <div class="grid-col" id="upload-col">
+      <h2 style="font-family:'Inter',sans-serif;font-size:1rem;font-weight:700;color:var(--text);letter-spacing:normal;text-transform:none;margin:0 0 1rem;">Subir PDFs</h2>
+
+      <div class="dropzone" id="dropzone" style="flex:1;border-radius:4px;">
+        <input
+          type="file"
+          id="pdf-input"
+          name="files"
+          multiple
+          accept=".pdf"
+          aria-label="Seleccionar archivos PDF"
+        />
+        <div class="dropzone-icon" style="background:none;width:auto;height:auto;border-radius:0;margin-bottom:0.5rem;">
+          <svg viewBox="0 0 24 24" aria-hidden="true" style="width:36px;height:36px;stroke:var(--muted);">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <polyline points="12 18 12 12"/>
+            <polyline points="9 15 12 12 15 15"/>
+          </svg>
+        </div>
+        <p style="font-family:var(--mono);font-size:0.82rem;color:var(--muted);text-align:center;line-height:1.5;">
+          Arrastra y suelta tus<br>archivos PDF aquí<br><span style="color:var(--muted);">o haz clic para explorar</span>
+        </p>
+      </div>
+
+      <button class="btn-primary" id="btn-validar" type="button" disabled
+        style="margin-top:0.75rem;border-radius:4px;background:#3B82F6;background-image:none;
+               box-shadow:none;font-family:var(--mono);display:flex;align-items:center;
+               justify-content:center;gap:0.5rem;font-size:0.85rem;padding:0.65rem;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Validar archivos
+      </button>
+    </div>
+
+    <!-- COLUMNA 2: Archivos cargados -->
+    <div class="grid-col" id="files-col">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;flex-shrink:0;">
+        <h2 style="font-family:var(--mono);font-size:0.72rem;font-weight:600;letter-spacing:0.1em;
+                   text-transform:uppercase;color:var(--muted);margin:0;">ARCHIVOS CARGADOS</h2>
+        <span id="files-count"
+          style="background:#0F172A;color:var(--muted);padding:0.1rem 0.5rem;
+                 border-radius:999px;font-size:0.72rem;font-weight:700;
+                 border:1px solid var(--border);">0</span>
+      </div>
+      <div style="width:100%;height:1px;background:var(--border);margin-bottom:0.75rem;flex-shrink:0;"></div>
+
+      <div id="file-list-container" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;min-height:0;">
+        <!-- Empty state -->
+        <div id="files-empty-state" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.5rem;">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#334155" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+            <line x1="9" y1="14" x2="15" y2="14" stroke-dasharray="2 2"/>
+          </svg>
+          <p style="font-size:0.8rem;color:#475569;text-align:center;line-height:1.4;">
+            No hay archivos cargados.<br>Sube PDFs para comenzar la validación.
+          </p>
+        </div>
+        <div id="file-list" role="list" aria-label="Archivos seleccionados" style="display:flex;flex-direction:column;gap:0.4rem;"></div>
+      </div>
+    </div>
+
+    <!-- COLUMNA 3: Criterios del MSL -->
+    <div class="grid-col" id="criterios-col"
+         style="align-items:center;justify-content:space-between;text-align:center;">
+
+      <h2 style="font-family:'Inter',sans-serif;font-size:1rem;font-weight:700;
+                 color:var(--text);letter-spacing:normal;text-transform:none;
+                 margin:0;align-self:flex-start;">Criterios del MSL</h2>
+
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.5rem;">
+        <!-- check/x icon like in image -->
+        <svg width="44" height="32" viewBox="0 0 44 32" fill="none">
+          <polyline points="2,16 14,28 26,4" stroke="#3B82F6" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="32" y1="8" x2="42" y2="24" stroke="#3B82F6" stroke-width="3.5" stroke-linecap="round"/>
+          <line x1="42" y1="8" x2="32" y2="24" stroke="#3B82F6" stroke-width="3.5" stroke-linecap="round"/>
+        </svg>
+        <div style="font-family:'Inter',sans-serif;font-size:2.8rem;font-weight:700;
+                    color:var(--text);line-height:1;" id="criterios-count-summary">0</div>
+        <div style="font-family:var(--mono);font-size:0.82rem;color:var(--muted);">configurados</div>
+      </div>
+
+      <button id="btn-gestionar-criterios" type="button"
+        onclick="document.getElementById('criterios-modal').style.display='flex'"
+        style="width:100%;padding:0.6rem;border-radius:4px;
+               background:transparent;border:1px solid var(--border);
+               color:var(--muted);font-family:var(--mono);font-size:0.82rem;
+               cursor:pointer;display:flex;align-items:center;justify-content:center;
+               gap:0.5rem;transition:border-color 0.15s,color 0.15s;"
+        onmouseover="this.style.borderColor='#3B82F6';this.style.color='#CBD5E1';"
+        onmouseout="this.style.borderColor='';this.style.color='';">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Gestionar criterios
+      </button>
+    </div>
+
+  </div>
+
+  <!-- Modal de Gestión de Criterios (outside page-content for correct z-index) -->
+  <div id="criterios-modal"
+    onclick="if(event.target===this)this.style.display='none'"
+    style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 1000; align-items: center; justify-content: center; padding: 1rem;">
+    <div class="card" id="criterios-card" onclick="event.stopPropagation()" style="margin: 0; max-height: 90vh; display: flex; flex-direction: column; padding: 0; width: 100%; max-width: 700px; overflow: hidden; position: relative; border-radius: 1.25rem;">
+      
+      <!-- Modal Header -->
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 1.5rem 2rem; border-bottom: 1px solid var(--border); flex-shrink: 0; background: var(--surface);">
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+          <h2 style="margin: 0; font-size: 1rem; color: var(--text); font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase;">Gestión de Criterios</h2>
+          <span class="badge-count" id="criterios-count">0</span>
+        </div>
+        <button id="btn-close-modal" type="button"
+          onclick="document.getElementById('criterios-modal').style.display='none'"
+          style="background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1.5rem; padding: 0 0.5rem; display: flex; align-items: center; justify-content: center; height: 32px; width: 32px; border-radius: 50%; transition: background 0.15s, color 0.15s;">&times;</button>
+      </div>
+  
+      <!-- Modal Body (scrollable) -->
+      <div class="criterios-content" id="criterios-content" style="padding: 1.5rem 2rem; overflow-y: auto; flex: 1;">
+      <div style="display: flex; flex-direction: column; gap: 2rem;">
+        
+        <!-- Criterios de Inclusión -->
+        <div>
+          <h3 style="font-size: 0.85rem; font-weight: 600; color: var(--success); border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 0.05em;">Criterios de Inclusión</h3>
+          <div id="lista-inclusion" class="criterios-list"></div>
+          
+          <div style="margin-top: 1rem;">
+            <button class="btn-secondary inc" id="btn-add-inc">+ Agregar criterio</button>
+            
+            <div id="form-add-inc" class="add-form" style="display: none;">
+              <div style="display: flex; gap: 0.75rem;">
+                <input type="text" placeholder="Código (ej: CI8)" class="form-input code-input" style="width: 120px;" required>
+                <input type="text" placeholder="Descripción" class="form-input desc-input" style="flex: 1;" required>
+              </div>
+              <div style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 0.5rem;">
+                <button type="button" class="btn-cancel" style="background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 0.4rem; padding: 0.35rem 0.75rem; font-size: 0.75rem; cursor: pointer;">Cancelar</button>
+                <button type="button" class="btn-save-new" style="background: var(--success); border: none; color: #0f1117; border-radius: 0.4rem; padding: 0.35rem 0.75rem; font-size: 0.75rem; font-weight: 600; cursor: pointer;">Guardar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Criterios de Exclusión -->
+        <div>
+          <h3 style="font-size: 0.85rem; font-weight: 600; color: var(--danger); border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 0.05em;">Criterios de Exclusión</h3>
+          <div id="lista-exclusion" class="criterios-list"></div>
+          
+          <div style="margin-top: 1rem;">
+            <button class="btn-secondary exc" id="btn-add-exc">+ Agregar criterio</button>
+            
+            <div id="form-add-exc" class="add-form" style="display: none;">
+              <div style="display: flex; gap: 0.75rem;">
+                <input type="text" placeholder="Código (ej: CE7)" class="form-input code-input" style="width: 120px;" required>
+                <input type="text" placeholder="Descripción" class="form-input desc-input" style="flex: 1;" required>
+              </div>
+              <div style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 0.5rem;">
+                <button type="button" class="btn-cancel" style="background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 0.4rem; padding: 0.35rem 0.75rem; font-size: 0.75rem; cursor: pointer;">Cancelar</button>
+                <button type="button" class="btn-save-new" style="background: var(--danger); border: none; color: #0f1117; border-radius: 0.4rem; padding: 0.35rem 0.75rem; font-size: 0.75rem; font-weight: 600; cursor: pointer;">Guardar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sección de resultados PDF -->
+  <section id="resultados" aria-live="polite" aria-label="Resultados de validación"></section>
+
+
+  </div><!-- /page-content -->
+
+  <footer>
+    MSL Validator &nbsp;·&nbsp; v0.2.0
+  </footer>
+
+<script>
+/* ════════════════════════════════════════════════════════════
+   MSL Validator — frontend logic
+   ════════════════════════════════════════════════════════════ */
+
+const dropzone   = document.getElementById('dropzone');
+const pdfInput   = document.getElementById('pdf-input');
+const fileList   = document.getElementById('file-list');
+const btnValidar = document.getElementById('btn-validar');
+const secResult  = document.getElementById('resultados');
+
+let archivosSeleccionados = [];
+
+// ── 1. Drag & drop visual ──────────────────────────────────────────────────
+dropzone.addEventListener('dragover',  e => { e.preventDefault(); dropzone.classList.add('drag-over'); });
+dropzone.addEventListener('dragleave', ()  => dropzone.classList.remove('drag-over'));
+dropzone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropzone.classList.remove('drag-over');
+  manejarArchivos([...e.dataTransfer.files]);
+});
+
+pdfInput.addEventListener('change', () => {
+  manejarArchivos([...pdfInput.files]);
+  pdfInput.value = '';
+});
+
+function manejarArchivos(files) {
+  const pdfs = files.filter(f => f.name.toLowerCase().endsWith('.pdf'));
+  archivosSeleccionados = [...archivosSeleccionados, ...pdfs];
+  renderFilePills();
+  btnValidar.disabled = archivosSeleccionados.length === 0;
+}
+
+function renderFilePills() {
+  fileList.innerHTML = '';
+  const emptyState = document.getElementById('files-empty-state');
+  const filesCount = document.getElementById('files-count');
+
+  // Toggle empty state visibility
+  if (emptyState) {
+    emptyState.style.display = archivosSeleccionados.length === 0 ? 'flex' : 'none';
+  }
+  if (filesCount) {
+    filesCount.textContent = archivosSeleccionados.length;
+  }
+
+  archivosSeleccionados.forEach((f, i) => {
+    const pill = document.createElement('div');
+    pill.className = 'file-pill';
+    pill.innerHTML = `
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+      </svg>
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(f.name)}</span>
+      <span class="pi-status pending" id="st-${idSeguro(f.name)}" style="margin-right: 0.5rem; flex-shrink: 0; display: inline-flex; align-items: center;">Pendiente</span>
+      <span style="color:var(--muted);font-size:0.72rem">${(f.size/1024).toFixed(1)} KB</span>
+      <button onclick="quitarArchivo(${i})" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:1rem;line-height:1;padding:0 0.2rem" aria-label="Quitar archivo">&times;</button>
+    `;
+    fileList.appendChild(pill);
+  });
+}
+
+function quitarArchivo(idx) {
+  archivosSeleccionados.splice(idx, 1);
+  renderFilePills();
+  btnValidar.disabled = archivosSeleccionados.length === 0;
+}
+
+// ── 2. Botón validar: sube archivos uno a uno ─────────────────────────────
+let isValidating = false;
+let cancelRequested = false;
+let currentAbortController = null;
+
+btnValidar.addEventListener('click', async () => {
+  if (isValidating) {
+    cancelRequested = true;
+    if (currentAbortController) {
+      currentAbortController.abort();
+    }
+    btnValidar.textContent = 'Cancelando...';
+    btnValidar.disabled = true;
+    return;
+  }
+
+  // Filtrar solo los que NO están listos
+  const cola = archivosSeleccionados.filter(f => {
+    const stEl = document.getElementById(`st-${idSeguro(f.name)}`);
+    return !stEl || stEl.textContent !== '✓ Listo';
+  });
+
+  if (cola.length === 0) return;
+
+  isValidating = true;
+  cancelRequested = false;
+
+  btnValidar.textContent = 'Cancelar validación';
+  btnValidar.style.background = 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)';
+  btnValidar.style.boxShadow = '0 4px 20px rgba(239, 68, 68, 0.3)';
+
+  const btnsQuitar = fileList.querySelectorAll('button');
+  btnsQuitar.forEach(b => b.style.display = 'none');
+  
+  const inputPdf = document.getElementById('pdf-input');
+  if(inputPdf) inputPdf.disabled = true;
+  dropzone.style.pointerEvents = 'none';
+
+  for (const file of cola) {
+    if (cancelRequested) break;
+
+    currentAbortController = new AbortController();
+    const stEl = document.getElementById(`st-${idSeguro(file.name)}`);
+    if (stEl) {
+      stEl.className = 'pi-status running';
+      stEl.innerHTML = '<div class="spinner" style="display:inline-block; vertical-align:middle; margin-right:4px; width:10px; height:10px; border-width:2px;"></div>Evaluando…';
+    }
+
+    try {
+      const fd = new FormData();
+      fd.append('archivo', file);
+      const res = await fetch('/evaluar', { 
+        method: 'POST', 
+        body: fd,
+        signal: currentAbortController.signal
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(err.detail || res.statusText);
+      }
+      if (stEl) {
+        stEl.className = 'pi-status done';
+        stEl.textContent = '✓ Listo';
+      }
+    } catch (err) {
+      if (stEl) {
+        if (err.name === 'AbortError') {
+          stEl.className = 'pi-status pending';
+          stEl.textContent = 'Cancelado';
+        } else {
+          stEl.className = 'pi-status error';
+          stEl.textContent = '✗ Error';
+          stEl.title = err.message;
+        }
+      }
+    } finally {
+      currentAbortController = null;
+    }
+
+    await cargarYRenderTabla();
+  }
+
+  isValidating = false;
+  cancelRequested = false;
+  
+  btnValidar.textContent = 'Validar archivos';
+  btnValidar.style.background = '';
+  btnValidar.style.boxShadow = '';
+  
+  // Revisamos si quedan pendientes (que no estén en '✓ Listo')
+  const quedanPendientes = Array.from(fileList.querySelectorAll('.pi-status')).some(el => el.textContent !== '✓ Listo');
+  btnValidar.disabled = !quedanPendientes;
+
+  if(inputPdf) inputPdf.disabled = false;
+  dropzone.style.pointerEvents = 'auto';
+
+  if (!quedanPendientes) {
+    setTimeout(() => {
+      archivosSeleccionados = [];
+      renderFilePills();
+    }, 4000);
+  } else {
+    const btnsQuitar = fileList.querySelectorAll('button');
+    btnsQuitar.forEach(b => b.style.display = 'inline-block');
+  }
+});
+
+// ── 3. Carga inicial de resultados al abrir la página ─────────────────────
+document.addEventListener('DOMContentLoaded', cargarYRenderTabla);
+
+// ── 4. GET /resultados → renderizar tabla ─────────────────────────────────
+async function cargarYRenderTabla() {
+  try {
+    const res  = await fetch('/resultados');
+    const rows = await res.json();
+    renderTabla(rows);
+  } catch (e) {
+    console.error('Error cargando resultados:', e);
+  }
+}
+
+function renderTabla(rows) {
+  asegurarSeccionResultados();
+
+  let wrap = secResult.querySelector('.tabla-wrap');
+  if (!wrap) {
+    wrap = document.createElement('div');
+    wrap.className = 'tabla-wrap';
+    secResult.appendChild(wrap);
+  }
+
+  // Cabecera de sección
+  let hdr = secResult.querySelector('.resultados-header');
+  if (!hdr) {
+    hdr = document.createElement('div');
+    hdr.className = 'resultados-header';
+    hdr.innerHTML = `
+      <h2>Resultados de evaluación</h2>
+      <div style="display:flex;align-items:center;gap:0.6rem">
+        <span class="badge-count" id="badge-count">0</span>
+        <a id="btn-excel" href="/exportar" target="_blank"
+           style="display:inline-flex;align-items:center;gap:0.4rem;
+                  background:linear-gradient(135deg,#22c55e,#16a34a);
+                  color:#fff;font-size:0.75rem;font-weight:700;
+                  padding:0.3rem 0.85rem;border-radius:999px;
+                  text-decoration:none;letter-spacing:0.04em;
+                  box-shadow:0 2px 12px rgba(34,197,94,0.3);
+                  transition:opacity 0.2s,transform 0.15s"
+           onmouseover="this.style.opacity='.85';this.style.transform='translateY(-1px)'"
+           onmouseout="this.style.opacity='1';this.style.transform='translateY(0)'">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2.5"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          Descargar Excel
+        </a>
+      </div>
+    `;
+    secResult.insertBefore(hdr, wrap);
+  }
+  document.getElementById('badge-count').textContent = rows.length;
+
+  if (rows.length === 0) {
+    wrap.innerHTML = `<div class="tabla-vacia">Sin resultados aún. Sube un PDF para empezar.</div>`;
+    return;
+  }
+
+  wrap.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Archivo</th>
+          <th>Decisión</th>
+          <th>Confianza</th>
+          <th>Fallo</th>
+          <th>CI</th>
+          <th>CE</th>
+          <th>Justificación</th>
+          <th>Fecha</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map(r => filaHTML(r)).join('')}
+      </tbody>
+    </table>
+  `;
+
+  // Botones eliminar
+  wrap.querySelectorAll('.btn-del').forEach(btn => {
+    btn.addEventListener('click', () => eliminarFila(Number(btn.dataset.id)));
+  });
+}
+
+function filaHTML(r) {
+  const dec    = (r.decision || '').toLowerCase();
+  const cls    = dec === 'incluido' ? 'incluido' : dec === 'excluido' ? 'excluido' : 'revisar';
+  const decLbl = dec === 'incluido' ? 'Incluido'  : dec === 'excluido' ? 'Excluido'  : 'Revisar';
+
+  const ciVals = [1,2,3,4,5,6,7].map(n => r[`ci${n}`]);
+  const ceVals = [1,2,3,4,5,6].map(n  => r[`ce${n}`]);
+
+  const miniBar = (vals, prefix) => vals.map((v, i) =>
+    `<span title="${prefix}${i+1}" style="
+      display:inline-block;width:18px;height:18px;line-height:18px;
+      text-align:center;border-radius:4px;font-size:0.6rem;font-weight:700;
+      background:${v === 1 ? 'rgba(52,211,153,0.2)' : 'rgba(248,113,113,0.2)'};
+      color:${v === 1 ? 'var(--success)' : 'var(--danger)'};
+      margin:1px;cursor:default"
+    >${v === 1 ? '✓' : '✗'}</span>`
+  ).join('');
+
+  const fecha = (r.fecha || '').split(' ')[0];
+
+  return `
+    <tr class="dec-${cls}">
+      <td style="color:var(--muted);font-size:0.72rem">${r.id}</td>
+      <td class="td-archivo" title="${escHtml(r.nombre_archivo || '')}">${escHtml(r.nombre_archivo || '')}</td>
+      <td><span class="badge-dec ${cls}">${decLbl}</span></td>
+      <td><span class="badge-conf">${escHtml(r.confianza || '-')}</span></td>
+      <td style="color:var(--muted);font-size:0.75rem;white-space:nowrap">${escHtml(r.criterio_fallo || '—')}</td>
+      <td>${miniBar(ciVals, 'CI')}</td>
+      <td>${miniBar(ceVals, 'CE')}</td>
+      <td class="td-just">${escHtml(r.justificacion || '')}</td>
+      <td style="color:var(--muted);font-size:0.72rem;white-space:nowrap">${escHtml(fecha)}</td>
+      <td><button class="btn-del" data-id="${r.id}" aria-label="Eliminar fila ${r.id}">Eliminar</button></td>
+    </tr>
+  `;
+}
+
+// ── 5. DELETE /resultados/{id} ─────────────────────────────────────────────
+async function eliminarFila(id) {
+  try {
+    const res = await fetch(`/resultados/${id}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error(await res.text());
+    await cargarYRenderTabla();
+  } catch (e) {
+    alert('Error eliminando: ' + e.message);
+  }
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function idSeguro(name) {
+  return name.replace(/[^a-z0-9]/gi, '_');
+}
+
+function asegurarSeccionResultados() {
+  // Nada que hacer — el <section id="resultados"> ya existe en el HTML
+}
+
+// ── 6. Criterios del MSL ───────────────────────────────────────────────────
+
+// Modal Logic
+const modal = document.getElementById('criterios-modal');
+const btnOpenModal = document.getElementById('btn-gestionar-criterios');
+const btnCloseModal = document.getElementById('btn-close-modal');
+
+btnOpenModal.addEventListener('click', () => {
+  modal.style.display = 'flex';
+});
+
+btnCloseModal.addEventListener('click', () => {
+  modal.style.display = 'none';
+});
+
+modal.addEventListener('click', (e) => {
+  if (e.target === modal) {
+    modal.style.display = 'none';
+  }
+});
+
+// Observers to update criterios count in the summary card
+const critCountEl = document.getElementById('criterios-count');
+if (critCountEl) {
+  const critObserver = new MutationObserver(() => {
+    const count = critCountEl.textContent;
+    const summary = document.getElementById('criterios-count-summary');
+    if (summary) summary.textContent = count;
+  });
+  critObserver.observe(critCountEl, { childList: true, characterData: true, subtree: true });
+}
+
+// Formularios de agregar
+function setupAddForm(btn, form, tipo) {
+  if (!btn || !form) return; // safety guard
+  const btnCancel = form.querySelector('.btn-cancel');
+  const btnSave   = form.querySelector('.btn-save-new');
+  const inputCode = form.querySelector('.code-input');
+  const inputDesc = form.querySelector('.desc-input');
+  if (!btnCancel || !btnSave || !inputCode || !inputDesc) return;
+
+  btn.addEventListener('click', () => {
+    btn.style.display = 'none';
+    form.style.display = 'flex';
+    inputCode.value = '';
+    inputDesc.value = '';
+    inputCode.focus();
+  });
+
+  btnCancel.addEventListener('click', () => {
+    form.style.display = 'none';
+    btn.style.display = 'inline-flex';
+  });
+
+  btnSave.addEventListener('click', async () => {
+    const codigo     = inputCode.value.trim();
+    const descripcion = inputDesc.value.trim();
+
+    if (!codigo || !descripcion) {
+      alert('Por favor, complete todos los campos.');
+      return;
+    }
+
+    btnSave.disabled = true;
+    try {
+      const res = await fetch('/criterios', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ codigo, tipo, descripcion })
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(err.detail || res.statusText);
+      }
+
+      form.style.display = 'none';
+      btn.style.display  = 'inline-flex';
+      await cargarCriterios();
+    } catch (err) {
+      alert('Error al agregar criterio: ' + err.message);
+    } finally {
+      btnSave.disabled = false;
+    }
+  });
+}
+
+setupAddForm(document.getElementById('btn-add-inc'), document.getElementById('form-add-inc'), 'inclusion');
+setupAddForm(document.getElementById('btn-add-exc'), document.getElementById('form-add-exc'), 'exclusion');
+
+// Cargar y renderizar criterios
+async function cargarCriterios() {
+  try {
+    const res = await fetch('/criterios');
+    if (!res.ok) throw new Error(res.statusText);
+    const criterios = await res.json();
+    renderCriterios(criterios);
+  } catch (err) {
+    console.error('Error cargando criterios:', err);
+  }
+}
+
+function renderCriterios(criterios) {
+  const incList = document.getElementById('lista-inclusion');
+  const excList = document.getElementById('lista-exclusion');
+
+  incList.innerHTML = '';
+  excList.innerHTML = '';
+
+  let totalCount = 0;
+
+  criterios.forEach(c => {
+    totalCount++;
+    const row = document.createElement('div');
+    row.className = 'criterio-row';
+    row.dataset.codigo = c.codigo;
+    row.innerHTML = `
+      <div class="criterio-view-mode" style="display: flex; flex: 1; align-items: flex-start; gap: 0.75rem;">
+        <span class="criterio-code">${escHtml(c.codigo)}</span>
+        <span class="criterio-desc">${escHtml(c.descripcion)}</span>
+      </div>
+      <div class="criterio-edit-mode" style="display: none; flex: 1; flex-direction: column; gap: 0.5rem;">
+        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.25rem;">
+          <span class="criterio-code">${escHtml(c.codigo)}</span>
+        </div>
+        <textarea class="criterio-textarea">${escHtml(c.descripcion)}</textarea>
+        <div style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 0.25rem;">
+          <button type="button" class="btn-cancel-edit" style="background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 0.4rem; padding: 0.35rem 0.75rem; font-size: 0.75rem; cursor: pointer;">Cancelar</button>
+          <button type="button" class="btn-save-edit" style="background: var(--accent); border: none; color: #fff; border-radius: 0.4rem; padding: 0.35rem 0.75rem; font-size: 0.75rem; font-weight: 600; cursor: pointer;">Guardar</button>
+        </div>
+      </div>
+      <div class="criterio-actions" style="display: flex; gap: 0.4rem; flex-shrink: 0; align-self: flex-start;">
+        <button type="button" class="btn-edit-row" aria-label="Editar">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+            <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+          </svg>
+          Editar
+        </button>
+        <button type="button" class="btn-del-row" aria-label="Eliminar" title="Eliminar criterio">✕</button>
+      </div>
+    `;
+
+    const btnEdit = row.querySelector('.btn-edit-row');
+    const btnDel = row.querySelector('.btn-del-row');
+    const viewMode = row.querySelector('.criterio-view-mode');
+    const editMode = row.querySelector('.criterio-edit-mode');
+    const actions = row.querySelector('.criterio-actions');
+    const btnCancelEdit = row.querySelector('.btn-cancel-edit');
+    const btnSaveEdit = row.querySelector('.btn-save-edit');
+    const textarea = row.querySelector('.criterio-textarea');
+
+    btnEdit.addEventListener('click', () => {
+      viewMode.style.display = 'none';
+      actions.style.display = 'none';
+      editMode.style.display = 'flex';
+      textarea.focus();
+      textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+    });
+
+    btnCancelEdit.addEventListener('click', () => {
+      textarea.value = c.descripcion;
+      editMode.style.display = 'none';
+      viewMode.style.display = 'flex';
+      actions.style.display = 'flex';
+    });
+
+    btnSaveEdit.addEventListener('click', async () => {
+      const newDesc = textarea.value.trim();
+      if (!newDesc) {
+        alert('La descripción no puede estar vacía');
+        return;
+      }
+      btnSaveEdit.disabled = true;
+      try {
+        const res = await fetch(`/criterios/${encodeURIComponent(c.codigo)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ descripcion: newDesc })
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ detail: res.statusText }));
+          throw new Error(err.detail || res.statusText);
+        }
+        c.descripcion = newDesc;
+        row.querySelector('.criterio-desc').textContent = newDesc;
+        editMode.style.display = 'none';
+        viewMode.style.display = 'flex';
+        actions.style.display = 'flex';
+      } catch (err) {
+        alert('Error al actualizar criterio: ' + err.message);
+      } finally {
+        btnSaveEdit.disabled = false;
+      }
+    });
+
+    btnDel.addEventListener('click', async () => {
+      if (!confirm(`¿Está seguro de que desea eliminar el criterio ${c.codigo}?`)) {
+        return;
+      }
+      try {
+        const res = await fetch(`/criterios/${encodeURIComponent(c.codigo)}`, {
+          method: 'DELETE'
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ detail: res.statusText }));
+          throw new Error(err.detail || res.statusText);
+        }
+        row.remove();
+        totalCount--;
+        document.getElementById('criterios-count').textContent = totalCount;
+      } catch (err) {
+        alert('Error al eliminar criterio: ' + err.message);
+      }
+    });
+
+    if (c.tipo === 'inclusion') {
+      incList.appendChild(row);
+    } else {
+      excList.appendChild(row);
+    }
+  });
+
+  document.getElementById('criterios-count').textContent = totalCount;
+}
+
+document.addEventListener('DOMContentLoaded', cargarCriterios);
+
+</script>
+
+<script src="/components/navbar.js?v=2"></script>
+
+</body>
+</html>

@@ -1,0 +1,35 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.venv/
+venv/
+env/
+
+# SQLite databases
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# App directories
+uploads/
+resultados/
+
+# Temp files, exports, and charts
+*.xlsx
+*.png
+*.log
+
+# PDFs in the root directory
+/*.pdf
+
+# Backup / dump files
+*dump.*
+navbar_dump.js
+
+# IDE configs
+.vscode/
+.idea/

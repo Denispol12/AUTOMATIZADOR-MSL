@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description"
+    content="MSL Validator – Eliminador de duplicados entre bases de datos bibliográficas (.bib)." />
+  <title>Eliminar Duplicados · MSL Validator</title>
+  <!-- Google Fonts: non-blocking para evitar pantalla en blanco sin red -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+    media="print" onload="this.media='all'" />
+  <noscript>
+    <link rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" />
+  </noscript>
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #22263a;
+      --border: #2a2d3e;
+      --accent: #7c6af7;
+      --accent-glow: rgba(124, 106, 247, 0.15);
+      --text: #e4e6f0;
+      --muted: #7b7f96;
+      --success: #34d399;
+      --danger: #f87171;
+      --warning: #fbbf24;
+
+      /* Colores por BD */
+      --bd-scopus: #fde8e8;
+      --bd-ieee: #dbeafe;
+      --bd-acm: #d1fae5;
+      --bd-elsevier: #fef9c3;
+      --bd-wos: #ede9fe;
+      --bd-otro: #e5e7eb;
+
+      --bd-scopus-txt: #9f1239;
+      --bd-ieee-txt: #1d4ed8;
+      --bd-acm-txt: #065f46;
+      --bd-elsevier-txt: #92400e;
+      --bd-wos-txt: #5b21b6;
+      --bd-otro-txt: #374151;
+    }
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0 0 4rem;
+    }
+
+    /* ── Header ── */
+    header {
+      text-align: center;
+      padding: 2.5rem 1.5rem 0;
+      margin-bottom: 2rem;
+    }
+
+    header .badge {
+      display: inline-block;
+      background: var(--accent-glow);
+      color: var(--accent);
+      border: 1px solid rgba(124, 106, 247, 0.35);
+      border-radius: 999px;
+      padding: 0.25rem 0.9rem;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 1rem;
+    }
+
+    h1 {
+      font-size: clamp(1.6rem, 4vw, 2.4rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      background: linear-gradient(135deg, #e4e6f0 0%, var(--accent) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    header p {
+      margin-top: 0.6rem;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    /* ── Layout ── */
+    .main-wrap {
+      width: 100%;
+      max-width: 1100px;
+      padding: 0 1.5rem;
+    }
+
+    /* ── Card ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 1.25rem;
+      padding: 2rem 1.75rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 4px 40px rgba(0, 0, 0, 0.35);
+    }
+
+    .card-title {
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 1.2rem;
+    }
+
+    /* ── Dropzone ── */
+    .dropzone {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      border: 2px dashed var(--border);
+      border-radius: 0.875rem;
+      padding: 2rem 1.25rem;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+      text-align: center;
+    }
+
+    .dropzone:hover,
+    .dropzone.drag-over {
+      border-color: var(--accent);
+      background: var(--accent-glow);
+      box-shadow: 0 0 0 4px rgba(124, 106, 247, 0.08);
+    }
+
+    .dropzone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+
+    .dropzone-icon {
+      width: 48px;
+      height: 48px;
+      background: rgba(124, 106, 247, 0.12);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 0.25rem;
+      transition: transform 0.2s;
+    }
+
+    .dropzone:hover .dropzone-icon {
+      transform: scale(1.08);
+    }
+
+    .dropzone-icon svg {
+      width: 26px;
+      height: 26px;
+      stroke: var(--accent);
+      fill: none;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .dropzone-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .dropzone-title span {
+      color: var(--accent);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .dropzone-sub {
+      font-size: 0.8rem;
+      color: var(--muted);
+      max-width: 500px;
+    }
+
+    #file-preview {
+      margin-top: 1rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .file-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(124, 106, 247, 0.08);
+      border: 1px solid rgba(124, 106, 247, 0.2);
+      border-radius: 0.5rem;
+      padding: 0.35rem 0.75rem;
+      font-size: 0.8rem;
+      color: var(--text);
+    }
+
+    .file-pill svg {
+      width: 13px;
+      height: 13px;
+      stroke: var(--accent);
+      fill: none;
+      stroke-width: 2;
+    }
+
+    /* ── Botón principal ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.65rem 1.5rem;
+      border: none;
+      border-radius: 0.7rem;
+      font-family: inherit;
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.18s, transform 0.15s, box-shadow 0.18s;
+    }
+
+    .btn:hover:not(:disabled) {
+      opacity: 0.88;
+      transform: translateY(-1px);
+    }
+
+    .btn:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    .btn:disabled {
+      opacity: 0.38;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #7c6af7 0%, #4f8ef7 100%);
+      color: #fff;
+      box-shadow: 0 4px 20px rgba(124, 106, 247, 0.35);
+      width: 100%;
+      justify-content: center;
+      margin-top: 1.25rem;
+      padding: 0.8rem 1.5rem;
+      font-size: 0.93rem;
+    }
+
+    .btn-danger {
+      background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+      color: #fff;
+      box-shadow: 0 4px 20px rgba(239, 68, 68, 0.3);
+    }
+
+    .btn-warn {
+      background: linear-gradient(135deg, #f97316 0%, #c2410c 100%);
+      color: #fff;
+      box-shadow: 0 4px 16px rgba(249, 115, 22, 0.3);
+      width: 100%;
+      justify-content: center;
+      margin-top: 0.75rem;
+      font-size: 0.86rem;
+    }
+
+    .btn-success {
+      background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+      color: #fff;
+      box-shadow: 0 4px 20px rgba(34, 197, 94, 0.3);
+    }
+
+    .btn-ghost {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-outline {
+      background: transparent;
+      color: var(--accent);
+      border: 1px solid rgba(124, 106, 247, 0.4);
+    }
+
+    .btn-outline:hover:not(:disabled) {
+      background: var(--accent-glow);
+    }
+
+    /* ── Resumen ── */
+    .resumen-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .stat-box {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 0.8rem;
+      padding: 1rem 1.25rem;
+      text-align: center;
+    }
+
+    .stat-num {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--accent);
+      line-height: 1;
+    }
+
+    .stat-lbl {
+      font-size: 0.72rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-top: 0.3rem;
+    }
+
+    /* ── Leyenda ── */
+    .leyenda {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      margin-bottom: 1rem;
+    }
+
+    .leyenda-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.76rem;
+      color: var(--muted);
+    }
+
+    .leyenda-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+
+    /* ── Acciones ── */
+    .acciones {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+
+    /* ── Tabla ── */
+    .tabla-wrap {
+      overflow-x: auto;
+      border-radius: 0.75rem;
+      border: 1px solid var(--border);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.83rem;
+    }
+
+    thead th {
+      background: #13161f;
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      padding: 0.75rem 0.9rem;
+      text-align: left;
+      white-space: nowrap;
+      position: sticky;
+      top: 0;
+    }
+
+    tbody tr {
+      border-top: 1px solid var(--border);
+      transition: background 0.15s;
+    }
+
+    tbody tr:hover {
+      filter: brightness(1.06);
+    }
+
+    td {
+      padding: 0.6rem 0.9rem;
+      vertical-align: middle;
+    }
+
+    /* Fondo de fila por BD */
+    tr.bd-scopus {
+      background: rgba(253, 232, 232, 0.06);
+    }
+
+    tr.bd-ieee {
+      background: rgba(219, 234, 254, 0.06);
+    }
+
+    tr.bd-acm {
+      background: rgba(209, 250, 229, 0.06);
+    }
+
+    tr.bd-elsevier {
+      background: rgba(254, 249, 195, 0.06);
+    }
+
+    tr.bd-wos {
+      background: rgba(237, 233, 254, 0.06);
+    }
+
+    tr.bd-otro {
+      background: rgba(229, 231, 235, 0.04);
+    }
+
+    tr.es-duplicado {
+      font-weight: 700;
+    }
+
+    /* Badge BD */
+    .badge-bd {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.22rem 0.65rem;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .badge-bd .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+    }
+
+    /* Badge estado */
+    .badge-estado {
+      display: inline-block;
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      font-weight: 600;
+    }
+
+    .badge-unico {
+      background: rgba(52, 211, 153, 0.12);
+      color: var(--success);
+    }
+
+    .badge-duplicado {
+      background: rgba(248, 113, 113, 0.15);
+      color: var(--danger);
+    }
+
+    /* Truncar título */
+    .td-titulo {
+      max-width: 320px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .td-autores {
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--muted);
+      font-size: 0.77rem;
+    }
+
+    /* ── Modal de eliminación ── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.65);
+      z-index: 2000;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+
+    .modal-overlay.open {
+      display: flex;
+    }
+
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 1.1rem;
+      padding: 2rem;
+      max-width: 640px;
+      width: 100%;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    }
+
+    .modal h3 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      color: var(--text);
+    }
+
+    .modal .modal-stats {
+      display: flex;
+      gap: 1.25rem;
+      margin: 1rem 0;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .modal .modal-stats strong {
+      color: var(--text);
+    }
+
+    .modal-list {
+      border: 1px solid var(--border);
+      border-radius: 0.6rem;
+      overflow: hidden;
+      margin-bottom: 1.25rem;
+    }
+
+    .modal-list .ml-item {
+      padding: 0.55rem 0.85rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.8rem;
+      display: flex;
+      gap: 0.75rem;
+      align-items: flex-start;
+    }
+
+    .modal-list .ml-item:first-child {
+      border-top: none;
+    }
+
+    .ml-titulo {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--text);
+    }
+
+    .ml-meta {
+      font-size: 0.72rem;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    /* ── Spinner ── */
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%) translateY(4px);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.65rem 1.4rem;
+      border-radius: 0.7rem;
+      font-size: 0.85rem;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s, transform 0.25s;
+      z-index: 3000;
+    }
+
+    #toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .tabla-vacia {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .fadein {
+      animation: fadeIn 0.25s ease;
+    }
+  </style>
+</head>
+
+<body data-page="duplicados">
+  <div id="navbar-container"></div>
+
+  <header>
+    <div class="badge">MSL · Deduplicador</div>
+    <h1>Eliminar Duplicados</h1>
+    <p>Detecta y elimina artículos repetidos entre diferentes bases de datos bibliográficas</p>
+  </header>
+
+  <div class="main-wrap">
+
+    <!-- ── Zona de carga ── -->
+    <div class="card" id="card-carga">
+      <div class="card-title">📂 Subir archivos .bib</div>
+
+      <div class="dropzone" id="dropzone">
+        <input type="file" id="bib-input" accept=".bib" multiple />
+        <div class="dropzone-icon">
+          <svg viewBox="0 0 24 24">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="17 8 12 3 7 8" />
+            <line x1="12" y1="3" x2="12" y2="15" />
+          </svg>
+        </div>
+        <p class="dropzone-title">Arrastra tus archivos .bib aquí · <span>haz clic para seleccionarlos</span></p>
+        <p class="dropzone-sub">Puedes subir varios a la vez (Scopus, IEEE, ACM, ScienceDirect, Web of Science)</p>
+      </div>
+
+      <div id="file-preview"></div>
+
+      <button class="btn btn-primary" id="btn-cargar" disabled>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0" />
+          <polyline points="8 12 12 8 16 12" />
+          <line x1="12" y1="8" x2="12" y2="16" />
+        </svg>
+        Cargar y detectar duplicados
+      </button>
+
+      <button class="btn btn-warn" id="btn-limpiar-top" title="Borra todos los artículos cargados y reinicia la sesión">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6" />
+          <path d="M19 6l-1 14H6L5 6" />
+          <path d="M10 11v6" />
+          <path d="M14 11v6" />
+          <path d="M9 6V4h6v2" />
+        </svg>
+        Limpiar sesión y cargar nuevos datos
+      </button>
+    </div>
+
+    <!-- ── Resumen + Acciones + Tabla ── -->
+    <div class="card" id="card-resultados" style="display:none">
+      <div class="card-title">📊 Resultados de la sesión</div>
+
+      <!-- Estadísticas -->
+      <div class="resumen-grid" id="resumen-grid"></div>
+
+      <!-- Desglose por BD -->
+      <div id="desglose-bd" style="margin-bottom:1rem; font-size:0.82rem; color:var(--muted);"></div>
+
+      <!-- Leyenda de colores -->
+      <div class="leyenda" id="leyenda">
+        <span class="leyenda-item"><span class="leyenda-dot" style="background:#ef4444"></span>Scopus</span>
+        <span class="leyenda-item"><span class="leyenda-dot" style="background:#3b82f6"></span>IEEE</span>
+        <span class="leyenda-item"><span class="leyenda-dot" style="background:#22c55e"></span>ACM</span>
+        <span class="leyenda-item"><span class="leyenda-dot" style="background:#f59e0b"></span>ScienceDirect</span>
+        <span class="leyenda-item"><span class="leyenda-dot" style="background:#a78bfa"></span>Web of Science</span>
+        <span class="leyenda-item"><span class="leyenda-dot" style="background:#6b7280"></span>Otra</span>
+        <span class="leyenda-item" style="margin-left:0.5rem; font-weight:700; color:var(--danger);">⚠ Negrita =
+          Duplicado</span>
+      </div>
+
+      <!-- Botones de acción -->
+      <div class="acciones">
+        <a id="btn-excel-marcados" href="/exportar-duplicados-marcados" target="_blank" class="btn btn-outline">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          Descargar Excel (con duplicados marcados)
+        </a>
+
+        <button class="btn btn-danger" id="btn-eliminar">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6" />
+            <path d="M19 6l-1 14H6L5 6" />
+            <path d="M10 11v6" />
+            <path d="M14 11v6" />
+            <path d="M9 6V4h6v2" />
+          </svg>
+          Eliminar duplicados (prioriza Scopus)
+        </button>
+
+        <button class="btn btn-success" id="btn-excel-limpio" disabled>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          Descargar Excel (limpio, sin duplicados)
+        </button>
+
+        <button class="btn btn-ghost" id="btn-nueva-sesion">
+          🔄 Nueva sesión
+        </button>
+      </div>
+
+      <!-- Tabla de artículos -->
+      <div class="tabla-wrap">
+        <table id="tabla-articulos">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Base de datos</th>
+              <th>Título</th>
+              <th>Año</th>
+              <th>Autores</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-body">
+            <tr>
+              <td colspan="6" class="tabla-vacia">Sin datos cargados.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /main-wrap -->
+
+  <!-- ── Modal de eliminación ── -->
+  <div class="modal-overlay" id="modal-elim">
+    <div class="modal">
+      <h3>🗑 Eliminación completada</h3>
+      <div class="modal-stats" id="modal-stats"></div>
+      <p style="font-size:0.8rem;color:var(--muted);margin-bottom:0.75rem;">Artículos eliminados y su base de datos de
+        origen:</p>
+      <div class="modal-list" id="modal-list"></div>
+      <button class="btn btn-ghost" id="btn-cerrar-modal" style="width:100%;justify-content:center;">Cerrar y ver tabla
+        actualizada</button>
+    </div>
+  </div>
+
+  <!-- ── Toast ── -->
+  <div id="toast"></div>
+
+  <script>
+    'use strict';
+
+    // ── Referencias DOM ────────────────────────────────────────────────
+    const dropzone = document.getElementById('dropzone');
+    const bibInput = document.getElementById('bib-input');
+    const filePreview = document.getElementById('file-preview');
+    const btnCargar = document.getElementById('btn-cargar');
+    const cardResultados = document.getElementById('card-resultados');
+    const resumenGrid = document.getElementById('resumen-grid');
+    const desgloseBd = document.getElementById('desglose-bd');
+    const tablaBody = document.getElementById('tabla-body');
+    const btnEliminar = document.getElementById('btn-eliminar');
+    const btnExcelLimpio = document.getElementById('btn-excel-limpio');
+    const btnNuevaSesion = document.getElementById('btn-nueva-sesion');
+    const btnLimpiarTop = document.getElementById('btn-limpiar-top');
+    const modalElim = document.getElementById('modal-elim');
+    const modalStats = document.getElementById('modal-stats');
+    const modalList = document.getElementById('modal-list');
+    const btnCerrarModal = document.getElementById('btn-cerrar-modal');
+    const toast = document.getElementById('toast');
+
+    let archivosSeleccionados = [];
+
+    // ── Helpers ────────────────────────────────────────────────────────
+    function esc(s) {
+      return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function showToast(msg, ms = 3200) {
+      toast.textContent = msg;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), ms);
+    }
+
+    // ── Colores por base de datos ──────────────────────────────────────
+    const BD_COLORS = {
+      'Scopus': { bg: '#9f1239', dot: '#ef4444', cls: 'bd-scopus' },
+      'IEEE': { bg: '#1d4ed8', dot: '#3b82f6', cls: 'bd-ieee' },
+      'ACM': { bg: '#065f46', dot: '#22c55e', cls: 'bd-acm' },
+      'ScienceDirect': { bg: '#92400e', dot: '#f59e0b', cls: 'bd-elsevier' },
+      'Web of Science': { bg: '#5b21b6', dot: '#a78bfa', cls: 'bd-wos' },
+    };
+    function bdColor(bd) {
+      return BD_COLORS[bd] || { bg: '#374151', dot: '#6b7280', cls: 'bd-otro' };
+    }
+
+    function badgeBD(bd) {
+      const c = bdColor(bd);
+      return `<span class="badge-bd" style="background:${c.dot}20;color:${c.dot}"><span class="dot" style="background:${c.dot}"></span>${esc(bd)}</span>`;
+    }
+
+    // ── Drag & drop ────────────────────────────────────────────────────
+    dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag-over'); });
+    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
+    dropzone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropzone.classList.remove('drag-over');
+      const files = [...e.dataTransfer.files].filter(f => f.name.toLowerCase().endsWith('.bib'));
+      if (files.length) actualizarSeleccion(files);
+    });
+    bibInput.addEventListener('change', () => {
+      const files = [...bibInput.files].filter(f => f.name.toLowerCase().endsWith('.bib'));
+      if (files.length) actualizarSeleccion(files);
+    });
+
+    function actualizarSeleccion(files) {
+      archivosSeleccionados = files;
+      filePreview.innerHTML = files.map(f => `
+      <span class="file-pill">
+        <svg viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+        ${esc(f.name)}
+      </span>`).join('');
+      btnCargar.disabled = false;
+    }
+
+    // ── Cargar y detectar duplicados ───────────────────────────────────
+    btnCargar.addEventListener('click', async () => {
+      if (!archivosSeleccionados.length) return;
+
+      btnCargar.disabled = true;
+      btnCargar.innerHTML = '<div class="spinner"></div>Subiendo archivos…';
+
+      const fd = new FormData();
+      archivosSeleccionados.forEach(f => fd.append('archivos', f));
+
+      try {
+        // 1. Subir
+        const r1 = await fetch('/subir-multiples-bibtex', { method: 'POST', body: fd });
+        if (!r1.ok) throw new Error((await r1.json()).detail || r1.statusText);
+        const resumen = await r1.json();
+
+        // 2. Detectar duplicados automáticamente
+        btnCargar.innerHTML = '<div class="spinner"></div>Detectando duplicados…';
+        const r2 = await fetch('/detectar-duplicados', { method: 'POST' });
+        if (!r2.ok) throw new Error((await r2.json()).detail || r2.statusText);
+        const deteccion = await r2.json();
+
+        // Mostrar resumen
+        renderResumen(resumen, deteccion);
+
+        // Cargar tabla
+        await cargarTabla();
+
+        cardResultados.style.display = '';
+        cardResultados.classList.add('fadein');
+        cardResultados.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+        showToast(`✓ ${resumen.total_entradas} artículos cargados · ${deteccion.grupos_duplicados} grupos de duplicados detectados`);
+      } catch (err) {
+        showToast('✗ Error: ' + err.message, 5000);
+      } finally {
+        btnCargar.disabled = false;
+        btnCargar.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0"/><polyline points="8 12 12 8 16 12"/><line x1="12" y1="8" x2="12" y2="16"/></svg>Cargar y detectar duplicados`;
+      }
+    });
+
+    // ── Render resumen estadístico ─────────────────────────────────────
+    function renderResumen(resumen, deteccion) {
+      resumenGrid.innerHTML = `
+      <div class="stat-box">
+        <div class="stat-num">${resumen.archivos_procesados}</div>
+        <div class="stat-lbl">Archivos .bib</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num">${resumen.total_entradas}</div>
+        <div class="stat-lbl">Artículos totales</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num" style="color:var(--danger)">${deteccion.grupos_duplicados}</div>
+        <div class="stat-lbl">Grupos duplicados</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num" style="color:var(--warning)">${deteccion.total_marcados_como_duplicado}</div>
+        <div class="stat-lbl">Arts. con duplicado</div>
+      </div>
+    `;
+
+      // Desglose por BD
+      const bd = resumen.desglose_base_datos || {};
+      const items = Object.entries(bd).map(([nombre, n]) => {
+        const c = bdColor(nombre);
+        return `<span style="display:inline-flex;align-items:center;gap:0.35rem;margin-right:0.75rem">
+        <span style="width:9px;height:9px;border-radius:50%;background:${c.dot};display:inline-block"></span>
+        <strong style="color:var(--text)">${n}</strong> ${esc(nombre)}
+      </span>`;
+      }).join('');
+      desgloseBd.innerHTML = `<span style="margin-right:0.5rem;color:var(--muted)">Desglose:</span>${items}`;
+    }
+
+    // ── Cargar tabla de artículos ──────────────────────────────────────
+    async function cargarTabla() {
+      const r = await fetch('/duplicados-articulos');
+      const filas = await r.json();
+
+      if (!filas.length) {
+        tablaBody.innerHTML = '<tr><td colspan="6" class="tabla-vacia">Sin artículos en la sesión actual.</td></tr>';
+        return;
+      }
+
+      tablaBody.innerHTML = filas.map((f, i) => {
+        const c = bdColor(f.base_datos);
+        const esDup = f.es_duplicado === 1;
+        const estadoBadge = esDup
+          ? `<span class="badge-estado badge-duplicado">Duplicado · Grupo ${f.grupo_duplicado}</span>`
+          : `<span class="badge-estado badge-unico">✓ Único</span>`;
+        return `
+        <tr class="${c.cls}${esDup ? ' es-duplicado' : ''}">
+          <td style="color:var(--muted);font-size:0.72rem">${i + 1}</td>
+          <td>${badgeBD(f.base_datos)}</td>
+          <td class="td-titulo" title="${esc(f.titulo)}">${esc(f.titulo || '—')}</td>
+          <td style="color:var(--muted);white-space:nowrap">${esc(f.anio || '—')}</td>
+          <td class="td-autores" title="${esc(f.autores)}">${esc(f.autores || '—')}</td>
+          <td>${estadoBadge}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    // ── Eliminar duplicados ────────────────────────────────────────────
+    btnEliminar.addEventListener('click', async () => {
+      btnEliminar.disabled = true;
+      btnEliminar.innerHTML = '<div class="spinner"></div>Eliminando…';
+
+      try {
+        const r = await fetch('/eliminar-duplicados', { method: 'POST' });
+        if (!r.ok) throw new Error((await r.json()).detail || r.statusText);
+        const resultado = await r.json();
+
+        // Mostrar modal con detalle
+        modalStats.innerHTML = `
+        <span>Eliminados: <strong>${resultado.total_eliminados}</strong></span>
+        <span>Grupos conservados: <strong>${resultado.total_conservados}</strong></span>
+      `;
+        modalList.innerHTML = resultado.detalle.length
+          ? resultado.detalle.map(d => `
+            <div class="ml-item">
+              <span class="ml-titulo" title="${esc(d.titulo)}">${esc(d.titulo)}</span>
+              <span class="ml-meta">${badgeBD(d.base_datos_eliminada)} → conservado en ${badgeBD(d.base_datos_conservada)}</span>
+            </div>`).join('')
+          : '<div class="ml-item">No se eliminó ningún artículo (sin duplicados activos).</div>';
+
+        modalElim.classList.add('open');
+
+        // Habilitar Excel limpio
+        btnExcelLimpio.disabled = false;
+        btnExcelLimpio.onclick = () => window.open('/exportar-duplicados-limpio', '_blank');
+
+      } catch (err) {
+        showToast('✗ Error al eliminar: ' + err.message, 5000);
+      } finally {
+        btnEliminar.disabled = false;
+        btnEliminar.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>Eliminar duplicados (prioriza Scopus)`;
+      }
+    });
+
+    // Cerrar modal y refrescar tabla
+    btnCerrarModal.addEventListener('click', async () => {
+      modalElim.classList.remove('open');
+      await cargarTabla();
+    });
+
+    // Cerrar modal con Escape
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') modalElim.classList.remove('open');
+    });
+
+    // ── Limpiar sesión (función compartida) ───────────────────────────
+    async function limpiarSesion() {
+      if (!confirm('¿Seguro que deseas limpiar la sesión actual? Esto borrará todos los artículos cargados.')) return;
+      try {
+        const r = await fetch('/limpiar-duplicados-sesion', { method: 'DELETE' });
+        if (!r.ok) throw new Error('Error al limpiar sesión');
+        // Resetear UI
+        archivosSeleccionados = [];
+        filePreview.innerHTML = '';
+        bibInput.value = '';
+        btnCargar.disabled = true;
+        cardResultados.style.display = 'none';
+        btnExcelLimpio.disabled = true;
+        showToast('✓ Sesión limpiada — puedes subir nuevos archivos');
+      } catch (err) {
+        showToast('✗ ' + err.message, 5000);
+      }
+    }
+
+    // ── Nueva sesión (botón en panel resultados) ───────────────────────
+    btnNuevaSesion.addEventListener('click', limpiarSesion);
+
+    // ── Limpiar top (botón siempre visible en zona de carga) ──────────
+    btnLimpiarTop.addEventListener('click', limpiarSesion);
+
+    // ── Cargar tabla al inicio (por si hay datos de sesión anterior) ──
+    document.addEventListener('DOMContentLoaded', async () => {
+      try {
+        const r = await fetch('/duplicados-articulos');
+        const filas = await r.json();
+        if (filas.length > 0) {
+          await cargarTabla();
+          cardResultados.style.display = '';
+          resumenGrid.innerHTML = `<div class="stat-box"><div class="stat-num">${filas.length}</div><div class="stat-lbl">Artículos en sesión</div></div>`;
+          desgloseBd.textContent = 'Sesión recuperada. Puedes continuar desde donde lo dejaste.';
+        }
+      } catch (_) { /* sin datos previos */ }
+    });
+  </script>
+
+  <script src="/components/navbar.js?v=2"></script>
+</body>
+
+</html>

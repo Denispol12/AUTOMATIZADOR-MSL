@@ -1,0 +1,15 @@
+fastapi
+uvicorn[standard]
+python-multipart
+google-genai
+openpyxl
+bibtexparser
+matplotlib
+seaborn
+openai
+pdfplumber
+
+# --- Testing ---
+pytest
+pytest-asyncio
+httpx

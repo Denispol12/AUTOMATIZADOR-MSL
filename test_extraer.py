@@ -1,0 +1,44 @@
+import sqlite3
+import json
+from main import init_db, DB_PATH, _get_conn
+
+# 1. Preparar base de datos
+init_db()
+with _get_conn() as conn:
+    conn.execute('DELETE FROM preguntas_extraccion')
+    conn.execute('DELETE FROM extraccion_respuestas_categoricas')
+    conn.execute('''
+        INSERT INTO preguntas_extraccion (id, texto_pregunta, tipo, opciones, orden)
+        VALUES (99, 'Técnica de IA utilizada', 'categorica', '["CNN", "SVM"]', 1)
+    ''')
+    
+# 2. Mockear y ejecutar logica de extraccion-datos localmente
+from fastapi import UploadFile
+import io
+import asyncio
+from main import extraer_datos
+
+# Para probar la logica, creamos un archivo falso
+class MockUploadFile:
+    def __init__(self, filename):
+        self.filename = filename
+        self.file = io.BytesIO(b'pdf content')
+
+# Parchear evaluar_extraccion_pdf
+import main
+async def mock_evaluar(ruta): return {'99': 'SVM'}
+main.evaluar_extraccion_pdf = mock_evaluar
+
+async def run_test():
+    archivo = MockUploadFile('test_doc.pdf')
+    res = await extraer_datos(archivo)
+    print('Respuestas mockeadas:', res)
+    
+    with _get_conn() as conn:
+        filas = conn.execute('SELECT * FROM extraccion_respuestas_categoricas').fetchall()
+        print('Total filas insertadas:', len(filas))
+        print('Detalle de filas:')
+        for f in filas:
+            print(f' - Opcion: {f["opcion_texto"]}, Valor: {f["valor"]}')
+
+asyncio.run(run_test())

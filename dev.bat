@@ -1,0 +1,9 @@
+@echo off
+echo Liberando puerto 8000 si estaba ocupado...
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":8000 " ^| findstr "LISTENING"') do (
+    echo Terminando proceso PID %%a en puerto 8000...
+    taskkill /F /PID %%a >nul 2>&1
+)
+timeout /t 1 /nobreak >nul
+echo Iniciando servidor...
+uvicorn main:app --reload
